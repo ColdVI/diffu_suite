@@ -6,9 +6,13 @@ __pycache__/
 .venv/
 
 # Local datasets and heavyweight model artifacts
+data
 data/
+checkpoints
 checkpoints/
+runs
 runs/
+third_party
 third_party/
 *.pt
 *.pth
