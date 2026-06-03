@@ -1,54 +1,242 @@
 # DiffuSuite
 
-**An end-to-end generative and restoration sandbox for learning diffusion
-models from first principles and connecting them to production tooling.**
+**An end-to-end diffusion sandbox that connects first-principles DDPM math,
+restoration tasks, and production-grade Stable Diffusion tooling.**
 
-DiffuSuite begins with the mathematics covered by
+DiffuSuite was built as a portfolio-grade extension of the ideas in
 [denizberkin/inzva-diffusion-notes](https://github.com/denizberkin/inzva-diffusion-notes):
-Gaussian forward noising, learned reverse denoising, ELBO intuition, and the
-simple epsilon-prediction objective. It then grows that foundation into one
-portfolio project with:
+Gaussian forward noising, learned reverse denoising, ELBO intuition, DDPM
+training, inference, and conditioning. The repository turns those ideas into a
+single modular project with a custom PyTorch core and a Gradio UI.
 
-- A from-scratch PyTorch DDPM with persistent schedule buffers.
-- A complete class-conditioned U-Net and classifier-free guidance (CFG).
-- CIFAR-10 training, EMA checkpoints, generation, inpainting, and exploratory
-  super-resolution.
-- Forward and reverse trajectory export as GIF and MP4.
-- Optional Hugging Face Diffusers hooks for Stable Diffusion LoRA inference,
-  DreamBooth-LoRA training, and Canny ControlNet.
-- A two-tab Gradio dashboard.
+[![Python](https://img.shields.io/badge/Python-3.10%2B-blue)](requirements.txt)
+[![PyTorch](https://img.shields.io/badge/PyTorch-DDPM-red)](models/ddpm.py)
+[![Gradio](https://img.shields.io/badge/UI-Gradio-orange)](app.py)
+[![Colab](https://img.shields.io/badge/Run-Colab-yellow)](notebooks/DiffuSuite_Colab.ipynb)
 
-The custom mathematical core does **not** use high-level diffusion wrappers.
-Diffusers is isolated inside `advanced/` for the production-scale comparison.
+## What This Project Demonstrates
 
-## Project Status
+- A **from-scratch DDPM** with persistent mathematical schedule buffers.
+- A **class-conditioned U-Net** with sinusoidal timestep embeddings and learned
+  class/null tokens for classifier-free guidance.
+- A **CIFAR-10 training pipeline** with AMP, EMA checkpoints, resume support,
+  generation previews, and reverse-trajectory export.
+- **Restoration pipelines** for inpainting and exploratory super-resolution.
+- **Diagnostic media** that visualizes how linear and cosine schedules destroy
+  information at different rates.
+- Optional **production integrations** using Hugging Face Diffusers: LoRA
+  inference, DreamBooth-LoRA training, and Canny ControlNet.
+- A **two-tab Gradio dashboard** that separates the mathematical core from the
+  production studio.
 
-The code paths are implemented and locally smoke-tested. This repository does
-not bundle a trained CIFAR-10 checkpoint or large Stable Diffusion weights.
-Train the custom linear and cosine checkpoints on a GPU before presenting
-generated-image quality or restoration quality as experimental results.
+The custom DDPM/U-Net/restoration sections avoid high-level diffusion wrappers.
+Diffusers is isolated in `advanced/` for the production-scale comparison.
 
-Bundled examples are reproducible **pre-training diagnostics** generated from
-the audited local CIFAR-10 data. They intentionally do not pretend that random
-weights are a trained generator.
+## Example Gallery
 
-## Verified Dataset
+These bundled examples are reproducible from the audited CIFAR-10 dataset. They
+are **not fake trained-model outputs**; they are diagnostics and input/output
+examples that can be generated before long GPU training finishes.
 
-The expected local dataset is an extracted CIFAR-10 image-folder tree:
+### CIFAR-10 Inputs
+
+The local dataset is an extracted CIFAR-10 image-folder tree. One verified input
+example from each class:
+
+![One audited CIFAR-10 input per class](artifacts/examples/cifar10_inputs.png)
+
+### Forward Noising Output: Linear vs. Cosine
+
+Same source image, same Gaussian noise tensor, different schedule:
+
+![Matched-noise linear and cosine forward degradation](artifacts/examples/forward_degradation.png)
+
+At `T = 1000`, the local diagnostic produced:
+
+| Schedule | `alpha_bar_T` | Forward variance at `T` |
+| --- | ---: | ---: |
+| Linear | `0.00004036` | `0.99995965` |
+| Cosine | approximately `0` | approximately `1` |
+
+### Forward-Process Video
+
+GIF preview:
+
+![Linear versus cosine forward timelapse](artifacts/examples/forward_linear_vs_cosine.gif)
+
+MP4 version:
+[artifacts/examples/forward_linear_vs_cosine.mp4](artifacts/examples/forward_linear_vs_cosine.mp4)
+
+### Restoration Inputs
+
+Inpainting input: source, white-mask region to regenerate, and masked image:
+
+![Inpainting source, regenerate mask, and masked input](artifacts/examples/inpainting_input_mask.png)
+
+Super-resolution input: original reference and a deliberately degraded
+low-resolution observation:
+
+![Reference image and low-resolution observation](artifacts/examples/super_resolution_input.png)
+
+### Post-Training Output Slots
+
+After running the Colab notebook, export and add these trained-model artifacts:
+
+| Artifact | Suggested path |
+| --- | --- |
+| Cosine generated class grid | `artifacts/generated/cifar10_cosine.png` |
+| Linear generated class grid | `artifacts/generated/cifar10_linear.png` |
+| Cosine reverse denoising GIF/MP4 | `artifacts/videos/cifar10_cosine_reverse.*` |
+| Linear reverse denoising GIF/MP4 | `artifacts/videos/cifar10_linear_reverse.*` |
+| Inpainted ship example | `artifacts/restored/inpainted_ship.png` |
+| Inpainting trajectory GIF/MP4 | `artifacts/videos/inpainting_ship.*` |
+| Super-resolution example | `artifacts/restored/super_res_ship.png` |
+| LoRA prompt examples | `artifacts/generated/lora/` |
+| ControlNet source-edge-output triplets | `artifacts/generated/controlnet/` |
+
+That boundary matters: the code is complete and validated, but final sample
+quality should be reported only after GPU training produces real checkpoints.
+
+## Repository Architecture
+
+```text
+diffu_suite/
+├── models/
+│   ├── ddpm.py                  # Schedule buffers and DDPM equations
+│   └── unet.py                  # Conditional residual U-Net with attention
+├── training/
+│   ├── dataset.py               # Extracted CIFAR-10 ImageFolder loader
+│   └── train_ddpm.py            # AMP, EMA, checkpoints, previews, resume
+├── inference/
+│   ├── sample_custom.py         # Class grids and reverse videos
+│   └── restore_custom.py        # Inpainting and super-resolution CLI
+├── pipelines/
+│   └── restoration.py           # Restoration sampling trajectories
+├── advanced/
+│   ├── lora_inference.py        # Stable Diffusion LoRA loading
+│   ├── train_lora.py            # Official DreamBooth-LoRA trainer launcher
+│   └── controlnet.py            # Canny-ControlNet inference
+├── utils/
+│   ├── diagnostics.py           # Linear-vs-cosine degradation report
+│   ├── trajectory_video.py      # GIF and MP4 encoding
+│   ├── checkpoints.py           # Shared checkpoint format
+│   └── generate_readme_assets.py
+├── scripts/
+│   └── validate_dataset.py
+├── notebooks/
+│   └── DiffuSuite_Colab.ipynb   # Direct GPU training notebook
+├── tests/
+│   └── test_core.py
+├── COLAB.md
+└── app.py                       # Two-tab Gradio dashboard
+```
+
+```mermaid
+flowchart LR
+    CIFAR[CIFAR-10 ImageFolder] --> Loader[training/dataset.py]
+    Loader --> Train[training/train_ddpm.py]
+    Train --> UNet[models/unet.py]
+    Train --> DDPM[models/ddpm.py]
+    UNet --> CKPT[EMA checkpoints]
+    DDPM --> CKPT
+    CKPT --> Sample[inference/sample_custom.py]
+    CKPT --> Restore[pipelines/restoration.py]
+    Restore --> Inpaint[Inpainting]
+    Restore --> SR[Super-resolution]
+    DDPM --> Diagnostics[utils/diagnostics.py]
+    Sample --> Media[GIF / MP4 trajectories]
+    Diagnostics --> Media
+    App[app.py] --> CKPT
+    App --> Advanced[advanced/ Diffusers]
+    Advanced --> LORA[LoRA]
+    Advanced --> ControlNet[Canny ControlNet]
+```
+
+## Mathematical Core
+
+[`models/ddpm.py`](models/ddpm.py) owns the diffusion process, not the U-Net.
+Any compatible epsilon-predicting model can be passed into training or sampling.
+
+Public methods use zero-based PyTorch timestep indices. Code timestep `0`
+corresponds to literature timestep `t = 1`.
+
+### Persistent DDPM Buffers
+
+Every important scalar schedule term is stored as a persistent tensor of shape
+`[T]`, so the formulas can be inspected directly from a checkpoint.
+
+| Buffer | Formula / meaning |
+| --- | --- |
+| `betas` | `beta_t` |
+| `alphas` | `alpha_t = 1 - beta_t` |
+| `alphas_cumprod` | `alpha_bar_t = prod_s alpha_s` |
+| `sqrt_alphas_cumprod` | `sqrt(alpha_bar_t)` |
+| `sqrt_one_minus_alphas_cumprod` | `sqrt(1 - alpha_bar_t)` |
+| `posterior_variance` | `tilde_beta_t` |
+| `posterior_std` | `sigma_t` |
+| `posterior_mean_coef1/2` | closed-form posterior mean coefficients |
+
+The implementation supports a linear beta schedule and the Nichol-Dhariwal
+cosine schedule with offset `s = 0.008`.
+
+### Forward Process
+
+```text
+q(x_t | x_0) = N(sqrt(alpha_bar_t) x_0, (1 - alpha_bar_t) I)
+
+x_t = sqrt(alpha_bar_t) x_0 + sqrt(1 - alpha_bar_t) epsilon
+epsilon ~ N(0, I)
+```
+
+### Training Objective
+
+```text
+L_simple(theta) = E[|| epsilon - epsilon_theta(x_t, t, c) ||^2]
+```
+
+Classifier-free guidance training randomly replaces labels with the learned null
+class token.
+
+### Reverse Sampling
+
+```text
+x_(t-1) = 1 / sqrt(alpha_t)
+          * (x_t - beta_t / sqrt(1 - alpha_bar_t) * epsilon_theta(x_t, t, c))
+          + sigma_t z
+```
+
+Guidance uses:
+
+```text
+guided_epsilon = (1 + w) * epsilon_conditional - w * epsilon_unconditional
+```
+
+## Custom U-Net
+
+[`models/unet.py`](models/unet.py) implements a compact CIFAR-scale U-Net.
+
+| Component | Details |
+| --- | --- |
+| Input / output | `[B, 3, 32, 32]` normalized to `[-1, 1]` |
+| Time conditioning | sinusoidal embedding + MLP |
+| Class conditioning | learned class embeddings plus learned null token |
+| CFG null class | label `-1` or `class_labels=None` |
+| Blocks | GroupNorm + SiLU + conditioned residual convolutions |
+| Attention | spatial self-attention at deepest level by default |
+| Default parameter count | about `15.7M` |
+| Default resolutions | `32 -> 16 -> 8 -> 16 -> 32` |
+
+## Dataset
+
+Expected local layout:
 
 ```text
 data/cifar10_dataset/
-├── train/
-│   ├── 0/*.png
-│   ├── ...
-│   └── 9/*.png
-└── test/
-    ├── 0/*.png
-    ├── ...
-    └── 9/*.png
+├── train/{0..9}/*.png
+└── test/{0..9}/*.png
 ```
 
-The current local folder passed this audit:
+The local folder was audited as:
 
 | Property | Verified value |
 | --- | ---: |
@@ -60,7 +248,7 @@ The current local folder passed this audit:
 | Shape | RGB `32x32` |
 | Byte-identical duplicate PNGs | 0 |
 
-Run the same audit:
+Run the audit:
 
 ```bash
 python3 scripts/validate_dataset.py --hashes
@@ -76,87 +264,9 @@ CIFAR-10 label mapping:
 | 3 | cat | 8 | ship |
 | 4 | deer | 9 | truck |
 
-![One audited CIFAR-10 input per class](artifacts/examples/cifar10_inputs.png)
-
-## Mathematical Core
-
-[`models/ddpm.py`](models/ddpm.py) stores each important literature term as a
-persistent PyTorch buffer with shape `[T]`. A code timestep of `0` corresponds
-to the literature timestep `t = 1`.
-
-The closed-form forward process is:
-
-```text
-q(x_t | x_0) = N(sqrt(alpha_bar_t) x_0, (1 - alpha_bar_t) I)
-```
-
-The training objective is:
-
-```text
-L_simple = E[|| epsilon - epsilon_theta(x_t, t, c) ||^2]
-```
-
-The reverse sampler implements:
-
-```text
-x_(t-1) = 1 / sqrt(alpha_t)
-          * (x_t - beta_t / sqrt(1 - alpha_bar_t) * epsilon_theta(x_t, t, c))
-          + sigma_t z
-```
-
-Classifier-free guidance uses the convention:
-
-```text
-guided_epsilon = (1 + w) * epsilon_conditional - w * epsilon_unconditional
-```
-
-The implementation supports:
-
-- Linear beta schedules.
-- Nichol-Dhariwal cosine schedules with `s = 0.008`.
-- Closed-form forward sampling at arbitrary timesteps.
-- Posterior statistics and ancestral reverse sampling.
-- CFG training dropout through a learned null class token.
-- Optional full reverse trajectories with shape `[B, T + 1, C, H, W]`.
-
-## Architecture
-
-```text
-diffu_suite/
-├── models/
-│   ├── ddpm.py                  # Schedule buffers and DDPM equations
-│   └── unet.py                  # Conditional residual U-Net with attention
-├── training/
-│   ├── dataset.py               # Extracted CIFAR-10 loader
-│   └── train_ddpm.py            # AMP, EMA, checkpoints, previews, resume
-├── inference/
-│   ├── sample_custom.py         # Class grids and reverse videos
-│   └── restore_custom.py        # Inpainting and super-resolution CLI
-├── pipelines/
-│   └── restoration.py           # Restoration sampling trajectories
-├── advanced/
-│   ├── lora_inference.py        # Stable Diffusion LoRA loading
-│   ├── train_lora.py            # Official DreamBooth-LoRA trainer launcher
-│   └── controlnet.py            # Canny-ControlNet inference
-├── utils/
-│   ├── diagnostics.py           # Linear-versus-cosine degradation report
-│   ├── trajectory_video.py      # GIF and MP4 encoding
-│   └── generate_readme_assets.py
-├── scripts/
-│   └── validate_dataset.py
-├── tests/
-│   └── test_core.py
-├── COLAB.md
-└── app.py                       # Two-tab Gradio dashboard
-```
-
-The default CIFAR-10 U-Net has approximately `15.7M` trainable parameters and
-uses feature resolutions `32 -> 16 -> 8`. Attention is limited to the deepest
-resolution by default to control memory usage.
-
 ## Installation
 
-Core mathematical project:
+Core project:
 
 ```bash
 python3 -m venv .venv
@@ -170,42 +280,63 @@ Optional production studio:
 pip install -r requirements-advanced.txt
 ```
 
-## Train the Custom DDPM
+## Colab Training
 
-Train two controlled experiments with the same U-Net configuration:
+The fastest path is the notebook:
+
+```text
+notebooks/DiffuSuite_Colab.ipynb
+```
+
+It assumes your Drive dataset lives at:
+
+```text
+/content/drive/MyDrive/diffu_suite/data/cifar10_dataset
+```
+
+Open the notebook in Colab, select a GPU runtime, and run cells in order. It
+will:
+
+1. Mount Drive.
+2. Clone or update this repo.
+3. Symlink Drive `data/` and `runs/` into the Colab workspace.
+4. Validate CIFAR-10.
+5. Run a tiny CUDA smoke test.
+6. Train or resume cosine and linear checkpoints.
+7. Export class grids, reverse videos, diagnostics, inpainting, and
+   super-resolution examples.
+8. Launch the Gradio app with a share link.
+
+Manual cosine training command:
 
 ```bash
 python3 training/train_ddpm.py \
+  --data-root data/cifar10_dataset \
   --schedule cosine \
   --output-dir runs/cifar10_cosine \
   --batch-size 64 \
-  --epochs 100
-
-python3 training/train_ddpm.py \
-  --schedule linear \
-  --output-dir runs/cifar10_linear \
-  --batch-size 64 \
-  --epochs 100
+  --epochs 100 \
+  --workers 2
 ```
 
-Checkpoints are written to:
-
-```text
-runs/cifar10_cosine/checkpoints/latest.pt
-runs/cifar10_linear/checkpoints/latest.pt
-```
-
-Resume an interrupted run:
+Manual linear comparison command:
 
 ```bash
 python3 training/train_ddpm.py \
-  --resume runs/cifar10_cosine/checkpoints/latest.pt \
-  --output-dir runs/cifar10_cosine
+  --data-root data/cifar10_dataset \
+  --schedule linear \
+  --output-dir runs/cifar10_linear \
+  --batch-size 64 \
+  --epochs 100 \
+  --workers 2
 ```
 
-## Generate and Restore
+Use `--resume runs/cifar10_cosine/checkpoints/latest.pt` to continue an
+interrupted run.
 
-Generate a class grid and a reverse-process timelapse:
+## Inference and Restoration
+
+Generate CIFAR-10 class samples and a reverse denoising video:
 
 ```bash
 python3 inference/sample_custom.py \
@@ -239,95 +370,55 @@ python3 inference/restore_custom.py \
   --output artifacts/restored/super_resolved.png
 ```
 
-The super-resolution path is an ILVR-style experiment using the trained image
-prior. It is not presented as a replacement for a dedicated super-resolution
-diffusion model.
+Inpainting is mathematically strict about known pixels: at each reverse step,
+known regions are replaced by the matching forward-noised source state. The
+tests verify exact final preservation of unmasked pixels.
 
-## Diagnostics and Examples
+The super-resolution path is an ILVR-style baseline. It preserves
+low-frequency content, but it is not claimed to be a dedicated super-resolution
+model.
 
-Generate a schedule report for any source image:
+## Gradio Dashboard
 
-```bash
-python3 utils/diagnostics.py path/to/source.png \
-  --output artifacts/generated/forward_degradation.png
-```
-
-Regenerate the seven bundled README assets:
+Launch locally:
 
 ```bash
-python3 utils/generate_readme_assets.py
+python3 app.py
 ```
 
-### 1. Linear vs. Cosine Information Destruction
+Launch from Colab:
 
-The rows below use the same source image and the same Gaussian noise tensor.
-Only the schedule changes.
+```bash
+python3 app.py --host 0.0.0.0 --share
+```
 
-![Matched-noise linear and cosine forward degradation](artifacts/examples/forward_degradation.png)
+Tabs:
 
-Observed at `T = 1000`:
-
-| Schedule | `alpha_bar_T` | Forward variance at `T` |
-| --- | ---: | ---: |
-| Linear | `0.00004036` | `0.99995965` |
-| Cosine | approximately `0` | approximately `1` |
-
-### 2. Forward-Process Video
-
-![Linear versus cosine forward timelapse](artifacts/examples/forward_linear_vs_cosine.gif)
-
-MP4 version:
-[`artifacts/examples/forward_linear_vs_cosine.mp4`](artifacts/examples/forward_linear_vs_cosine.mp4)
-
-### 3. Inpainting Inputs
-
-![Inpainting source, regenerate mask, and masked input](artifacts/examples/inpainting_input_mask.png)
-
-At every reverse step, known pixels are replaced with the matching
-forward-noised source state. The local tests verify that known pixels are exact
-at the final output.
-
-### 4. Super-Resolution Inputs
-
-![Reference image and low-resolution observation](artifacts/examples/super_resolution_input.png)
-
-At every reverse step, low-frequency content is aligned to the observed input.
-The local tests verify exact final low-frequency agreement.
-
-### 5. Post-Training Output Catalog
-
-After the Colab training runs, export and retain:
-
-| Artifact | Suggested path |
+| Tab | What it does |
 | --- | --- |
-| Cosine class grid | `artifacts/generated/cifar10_cosine.png` |
-| Linear class grid | `artifacts/generated/cifar10_linear.png` |
-| Reverse denoising GIF and MP4 | `artifacts/videos/cifar10_cosine_reverse.*` |
-| Inpainting result | `artifacts/restored/inpainted.png` |
-| Inpainting trajectory | `artifacts/videos/inpainting.*` |
-| Super-resolution result | `artifacts/restored/super_resolved.png` |
-| LoRA text-to-image examples | `artifacts/generated/lora/` |
-| ControlNet source, edges, output triplets | `artifacts/generated/controlnet/` |
+| Custom Mathematical Core | class generation, inpainting, super-resolution, schedule diagnostics |
+| Production-Grade Studio | LoRA text-to-image and Canny ControlNet through Diffusers |
 
-## Production-Grade Studio
+Checkpoint generation always uses the schedule saved inside the checkpoint.
+Schedule switching is exposed only in the diagnostics panel, which avoids
+sampling a denoiser under a schedule it was not trained on.
 
-The production integrations are lazy: importing the custom core does not
-download models or require Diffusers.
+## Production Studio
+
+The production modules are optional and lazy. The custom DDPM code imports
+without downloading large Stable Diffusion weights.
 
 ### LoRA Inference
 
-[`advanced/lora_inference.py`](advanced/lora_inference.py) uses
-`AutoPipelineForText2Image`, then attaches local or Hub-hosted adapters through
-`load_lora_weights`.
+[`advanced/lora_inference.py`](advanced/lora_inference.py) loads a Stable
+Diffusion text-to-image pipeline and attaches local or Hub-hosted LoRA adapters
+with `load_lora_weights`.
 
-### LoRA Training
+### DreamBooth-LoRA Training
 
 [`advanced/train_lora.py`](advanced/train_lora.py) launches Hugging Face
-Diffusers' maintained DreamBooth-LoRA example. Keeping the trainer upstream
-avoids freezing a large, fast-moving training script inside this educational
-repository.
-
-Prepare `10-20` licensed images of one concept and inspect the command:
+Diffusers' maintained DreamBooth-LoRA example instead of freezing a copy of a
+fast-moving trainer in this repository.
 
 ```bash
 git clone --depth 1 https://github.com/huggingface/diffusers third_party/diffusers
@@ -338,74 +429,66 @@ python3 advanced/train_lora.py data/lora/my_concept \
   --dry-run
 ```
 
-Remove `--dry-run` to launch the GPU job.
+Remove `--dry-run` when the command and concept image folder are correct.
 
 ### Canny ControlNet
 
 [`advanced/controlnet.py`](advanced/controlnet.py) extracts Canny edges with
-OpenCV, loads `lllyasviel/sd-controlnet-canny`, and generates a new image while
-preserving the uploaded layout.
-
-## Gradio Dashboard
-
-Launch:
-
-```bash
-python3 app.py
-```
-
-The dashboard contains:
-
-- **Custom Mathematical Core:** conditional generation, inpainting,
-  super-resolution, and matched-noise schedule diagnostics.
-- **Production-Grade Studio:** LoRA text-to-image and Canny ControlNet.
-
-Checkpoint generation always uses the schedule stored in the checkpoint.
-Changing schedules only in the diagnostics panel avoids invalid comparisons
-between a trained denoiser and an unseen inference schedule.
+OpenCV, loads `lllyasviel/sd-controlnet-canny`, and generates a new image that
+preserves the uploaded layout.
 
 ## GPU Guidance
 
-The local development machine used for verification is an Apple Silicon system
-with `16 GB` unified memory. PyTorch MPS is available and passed a seeded tensor
-generation check. It is suitable for tests, dashboard development, and small
-experiments.
-
-Use Google Colab for the long jobs. See [`COLAB.md`](COLAB.md).
-
-| Workload | Local Apple MPS | Colab GPU |
+| Workload | Local Apple Silicon / CPU | Colab GPU |
 | --- | --- | --- |
-| Unit tests and diagnostics | Recommended | Optional |
-| Tiny one-step training smoke test | Recommended | Optional |
-| Full CIFAR-10 DDPM training | Possible but slow | Recommended |
-| Stable Diffusion LoRA inference | Memory-sensitive | Recommended |
-| DreamBooth-LoRA training | Not recommended | Recommended |
-| ControlNet inference | Memory-sensitive | Recommended |
+| Unit tests and diagnostics | good | optional |
+| Tiny training smoke test | good | optional |
+| Full CIFAR-10 DDPM training | slow | recommended |
+| Stable Diffusion LoRA inference | memory-sensitive | recommended |
+| DreamBooth-LoRA training | not recommended | recommended |
+| ControlNet inference | memory-sensitive | recommended |
 
-Start custom Colab training with `--batch-size 64`. Increase to `128` if the
-assigned GPU permits it, or reduce to `32` after an out-of-memory error. CUDA
-training automatically enables float16 AMP. Colab accelerator models and
-availability vary by session; free resources are not guaranteed.
+Start Colab training with `--batch-size 64`. Drop to `32` after CUDA
+out-of-memory. Try `128` only on a stronger GPU. CUDA training uses float16 AMP
+automatically.
 
-## Findings from Local Verification
+## Validation Status
 
-- The extracted CIFAR-10 folder is complete and balanced.
-- The mathematical process exposes `18` persistent schedule buffers.
-- Closed-form noising and epsilon-based `x_0` reconstruction agree numerically.
-- CFG arithmetic, training loss, EMA checkpoint reloads, and class sampling
-  execute successfully.
-- Inpainting preserves all known final pixels exactly.
-- Exploratory super-resolution preserves the requested final low frequencies.
-- GIF and MP4 trajectory export both work locally.
-- Gradio constructs the full two-tab dashboard successfully.
-- Optional production modules produce clear installation errors when Diffusers
-  is absent instead of breaking the custom core.
+Local verification before publication:
+
+```text
+pytest:                   7 passed
+dataset audit:            passed
+CPU training smoke test:  passed
+Apple MPS training step:  passed
+EMA checkpoint reload:    passed
+Inpainting CLI:           passed
+Super-resolution CLI:     passed
+GIF and MP4 export:       passed
+Gradio HTTP probe:        200 OK
+```
 
 Run the regression suite:
 
 ```bash
 python3 -m pytest -q
 ```
+
+## Reproduce README Media
+
+```bash
+python3 utils/generate_readme_assets.py
+```
+
+This recreates:
+
+- `artifacts/examples/cifar10_inputs.png`
+- `artifacts/examples/forward_degradation.png`
+- `artifacts/examples/forward_linear_vs_cosine.gif`
+- `artifacts/examples/forward_linear_vs_cosine.mp4`
+- `artifacts/examples/inpainting_input_mask.png`
+- `artifacts/examples/super_resolution_input.png`
+- `artifacts/examples/source_ship.png`
 
 ## References
 
@@ -417,4 +500,3 @@ python3 -m pytest -q
 - [Diffusers ControlNet guide](https://huggingface.co/docs/diffusers/en/using-diffusers/controlnet)
 - [Diffusers DreamBooth examples](https://github.com/huggingface/diffusers/tree/main/examples/dreambooth)
 - [Google Colab FAQ](https://research.google.com/colaboratory/faq.html)
-
