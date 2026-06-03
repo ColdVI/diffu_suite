@@ -4,6 +4,18 @@ Colab is the recommended place to train the custom CIFAR-10 checkpoints and run
 the optional Stable Diffusion integrations. GPU types and availability vary by
 session, so begin by checking the assigned accelerator.
 
+For a direct runnable notebook, open:
+
+```text
+notebooks/DiffuSuite_Colab.ipynb
+```
+
+The notebook assumes your Drive folder is:
+
+```text
+/content/drive/MyDrive/diffu_suite/data/cifar10_dataset
+```
+
 ## 1. Select a GPU Runtime
 
 In Colab, choose **Runtime > Change runtime type > GPU**, then run:
@@ -99,4 +111,3 @@ Remove `--dry-run` when the image folder and command look correct.
 
 Colab's free resources are dynamic rather than guaranteed. Save checkpoints to
 Google Drive if you need them to survive runtime recycling.
-
