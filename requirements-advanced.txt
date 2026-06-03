@@ -1,0 +1,7 @@
+-r requirements.txt
+diffusers>=0.32
+transformers>=4.46
+accelerate>=1.2
+peft>=0.14
+safetensors>=0.4
+

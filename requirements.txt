@@ -1,0 +1,10 @@
+torch>=2.4
+torchvision>=0.19
+numpy>=1.26
+Pillow>=10.0
+matplotlib>=3.8
+gradio>=5.0
+imageio>=2.34
+opencv-python-headless>=4.10
+tqdm>=4.66
+

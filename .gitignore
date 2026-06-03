@@ -1,0 +1,23 @@
+.DS_Store
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.venv/
+
+# Local datasets and heavyweight model artifacts
+data/
+checkpoints/
+runs/
+third_party/
+*.pt
+*.pth
+*.ckpt
+*.safetensors
+
+# Generated files are reproducible; selected README media is explicitly allowed.
+artifacts/generated/
+artifacts/restored/
+artifacts/videos/
+!artifacts/examples/
+!artifacts/examples/**
