@@ -3,8 +3,7 @@
 **An end-to-end diffusion sandbox that connects first-principles DDPM math,
 restoration tasks, and production-grade Stable Diffusion tooling.**
 
-DiffuSuite was built as a portfolio-grade extension of the ideas in
-[denizberkin/inzva-diffusion-notes](https://github.com/denizberkin/inzva-diffusion-notes):
+DiffuSuite was built as a portfolio-grade extension of ideas for diffusional models.
 Gaussian forward noising, learned reverse denoising, ELBO intuition, DDPM
 training, inference, and conditioning. The repository turns those ideas into a
 single modular project with a custom PyTorch core and a Gradio UI.
